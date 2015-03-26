@@ -6,7 +6,7 @@ var Game = {
 		ananas: null,
 		data: null,
 		freeCells: null,
-		exit: null,
+
 
 		
 		init: function() {
@@ -34,7 +34,7 @@ var Game = {
 			} else {
 
 				this.player = new Player(p[0], p[1]);
-				this.exit = new Exit(e[0], e[1]);
+				var exit = new Exit(e[0], e[1]);
 				var scheduler = new ROT.Scheduler.Simple();
 				scheduler.add(this.player, true);
 				this.engine = new ROT.Engine(scheduler);
@@ -101,7 +101,6 @@ var Game = {
 
 				var index = Math.floor(ROT.RNG.getUniform() * freeCells.length);
 				var k = freeCells.splice(index, 1)[0];
-				console.log(k)
 				var x = k[0];
 				var y = k[1];
 				return [x, y];

@@ -4,6 +4,8 @@ var Player = function(x, y) {
 		this._y = y;
 		this.nx = x;
 		this.ny = y;
+
+
 		
 		Game.display.getContainer().addEventListener("click", this);
 		this._draw();
@@ -43,8 +45,8 @@ Player.prototype.handleEvent = function(e) {
 	var dir = Game.display.eventToPosition(e);
 	this.nx = dir[0];
 	this.ny = dir[1];
-		var path = this.getPath([this.nx, this.ny]);
-console.log(this._x, this._y,dir, path.length)
+	var path = this.getPath([this.nx, this.ny]);
+
 	path.shift();
 	if (path.length < 1) {
 	}else {
@@ -62,7 +64,67 @@ console.log(this._x, this._y,dir, path.length)
 }
 
 Player.prototype._draw = function() {
-		Game.display.draw(this._x, this._y, "@", "#ff0");
+
+	var lightPasses = function(x, y) {
+	  var key = x+","+y;
+	  if (key in Game.data) { return (Game.data[key] == 0); }
+		return false;
+	}
+
+	// var fov = new ROT.FOV.PreciseShadowcasting(lightPasses);
+
+
+	// fov.compute(this._x, this._y, 10, function(x, y, r, visibility) {
+	//     var ch = (r ? "" : "@");
+	//     var color = (Game.data[x+","+y] ? "#fff": "#660");
+	//     Game.display.draw(x, y, ch, "#ff0", color);
+	// });
+
+	/* prepare a FOV algorithm */
+	window.lightData = {};
+	// var lightPasses = function(x, y) { 
+	//     return (Game.data[x+","+y] == 1);
+	// }
+	var fov = new ROT.FOV.PreciseShadowcasting(lightPasses, {topology:6});
+
+
+	/* prepare a lighting algorithm */
+	var reflectivity = function(x, y) {
+	    return (Game.data[x+","+y] == 1 ? 0.3 : 0);
+	}
+	var lighting = new ROT.Lighting(reflectivity, {range:12, passes:2});
+	lighting.setFOV(fov);
+	lighting.setLight(this._x, this._y,  [200, 200, 200]);
+
+
+	var lightingCallback = function(x, y, color) {
+	    lightData[x+","+y] = color;
+	}
+	lighting.compute(lightingCallback);
+
+	/* all cells are lit by ambient light; some are also lit by light sources */
+	var ambientLight = [100, 100, 100];
+	for (var id in Game.data) {
+	    var parts = id.split(",");
+	    var x = parseInt(parts[0]);
+	    var y = parseInt(parts[1]);
+
+
+
+	    var baseColor = (Game.data[id] ? [200, 200, 200] : [0, 0, 0]);
+	    var light = ambientLight;
+
+	    if (id in lightData) { /* add light from our computation */
+	        light = ROT.Color.add(light, lightData[id]);
+	    }
+
+	    var finalColor = ROT.Color.multiply(baseColor, light);
+	   Game.display.draw(x, y, null, null, ROT.Color.toRGB(finalColor));
+	}
+
+
+Game.display.draw(this._x, this._y, "@", "#ff0");
+
 }
 		
 Player.prototype._checkBox = function() {
