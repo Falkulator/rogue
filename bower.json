@@ -1,0 +1,10 @@
+{
+  "name": "game",
+  "private": true,
+  "dependencies": {
+    "bootstrap-sass-official": "~3.3.1",
+    "modernizr": "~2.8.1",
+    "rot.js": "~0.5.0",
+    "hexlib": "~0.1.0"
+  }
+}
