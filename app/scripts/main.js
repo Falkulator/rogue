@@ -1,47 +1,81 @@
 var Game = {
 		display: null,
+		offset: [0, 0], /* cell in left-top of canvas */
 		map: {},
+		colors: {},
 		engine: null,
 		player: null,
-		ananas: null,
 		data: null,
+		entities: null,
 		freeCells: null,
 
 
 		
 		init: function() {
-				var dWidth = 150,
-						dHeight = 50;
 				this.display = new ROT.Display({
-						width: dWidth, 
-						height: dHeight, 
-						fontSize:12,
+						fontSize: 22,
+						spacing: 2,
 						layout: "hex"
 				});
 				document.body.appendChild(this.display.getContainer());
-
-				this._generateMap();
+				
+				this.entities = {};
 
 				this._prepEntities();
+
+				this._resize();
+				window.addEventListener("resize", this._resize.bind(this));
 		},
 
 		_prepEntities: function() { 
+			this._generateMap();
 			var p = this._getFreeCell(this.freeCells);
 			var e = this._getFreeCell(this.freeCells);
 			p = p.map(function(i) {return 2 * Math.round(i / 2)});//for valid hex value
-			if (this._getPath(p,e).length < 30) {
+			if (this._getPath(p,e).length < 60) {
 				this._prepEntities();
 			} else {
 
-				this.player = new Player(p[0], p[1]);
-				var exit = new Exit(e[0], e[1]);
+				var exit = new Game.Exit(e[0], e[1]);
+				this.player = new Game.Player(p[0], p[1]);
+				for (var i=0;i<12;i++) {
+					var m = this._getFreeCell(this.freeCells);
+				}
+
+				this.setCenter();
 				var scheduler = new ROT.Scheduler.Simple();
 				scheduler.add(this.player, true);
+				scheduler.add(exit, true);
 				this.engine = new ROT.Engine(scheduler);
 				this.engine.start();
 			}
 
 
+		},
+
+		setEntity: function(entity, x, y) {
+			var oldPosition = entity.getPosition();
+			if (oldPosition) {
+				var oldKey = oldPosition.join(",");
+				if (this.entities[oldKey] == entity) { delete this.entities[oldKey]; }
+				this._draw(oldPosition[0], oldPosition[1]);
+			}
+
+			var key = x+","+y;
+			entity.setPosition(x, y);
+
+			if (x !== null) {
+				this.entities[key] = entity;
+				this._draw(x, y);
+			}
+		},
+		
+		removeEntity: function(entity) {
+			var oldPosition = entity.getPosition();
+			if (!oldPosition) { return; }
+			var oldKey = oldPosition.join(",");
+			if (this.entities[oldKey] == entity) { delete this.entities[oldKey]; }
+			this._draw(oldPosition[0], oldPosition[1]);
 		},
 
 		_getPath: function(start, end) {
@@ -61,7 +95,7 @@ var Game = {
 		},
 
 		_generateMap: function() {
-			this.display.clear();
+
 				/* hexagonal map and rules */
 				var w= 150, h=50;
 				var data = {};
@@ -82,7 +116,7 @@ var Game = {
 				    if (value === 0) {
 				    	Game.freeCells.push([x, y]);
 				    }
-				    Game.display.DEBUG(x, y, value);
+				    Game.display.draw(x, y, value);
 				});
 
 				/* input callback informs about map structure */
@@ -116,24 +150,56 @@ var Game = {
 				var y = parseInt(parts[1]);
 				return new what(x, y);
 		},
-		
-		_generateBoxes: function(freeCells) {
-				for (var i=0;i<10;i++) {
-						var index = Math.floor(ROT.RNG.getUniform() * freeCells.length);
-						var key = freeCells.splice(index, 1)[0];
-						this.map[key] = "*";
-						if (!i) { this.ananas = key; } /* first box contains an ananas */
+
+		setCenter: function() {
+			var pos = [this.player._x, this.player._y];
+			var opts = this.display.getOptions();
+			this.offset[0] = pos[0]-Math.floor(opts.width/2);
+			this.offset[1] = pos[1]-Math.floor(opts.height/2);
+			if ((this.offset[0] + this.offset[1]) % 2) { this.offset[0]--; }
+
+			/* redraw all */
+			this.display.clear();
+
+			for (var j=0 - 1;j<opts.height + 1;j++) {
+				for (var i=j%2 - 2;i<opts.width + 2;i+=2) {
+					this._draw(i+this.offset[0], j+this.offset[1]);
 				}
+			}
 		},
+
+		_resize: function() {
+			var size = this.display.computeSize(window.innerWidth, window.innerHeight);
+			this.display.setOptions({width:size[0], height:size[1]});
+			this.setCenter();
 		
-		_drawWholeMap: function() {
-				for (var key in this.map) {
-						var parts = key.split(",");
-						var x = parseInt(parts[0]);
-						var y = parseInt(parts[1]);
-						this.display.draw(x, y, this.map[key]);
-				}
+		},
+
+
+		_draw: function(x, y) {
+			var dispX = x - this.offset[0];
+			var dispY = y - this.offset[1];
+			var key = x+","+y;
+			var entity = this.entities[key];
+			var tile = this.data[key];
+
+		if (entity) {
+				var color = this.getColor(x,y);
+				this.display.draw(dispX, dispY, entity.ch, entity.fg, color);
+			} else {
+				var color = this.getColor(x,y);
+				this.display.draw(dispX, dispY, null, null, color);
+			}
+		},
+
+		getColor: function(x,y) {
+			if (!this.colors[x+","+y]) {
+				return "black";
+			}
+			var c = ROT.Color.toRGB(this.colors[x+","+y])
+			return c;
 		}
+
 };
 
 $(document).ready(function() { 
