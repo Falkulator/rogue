@@ -1,13 +1,16 @@
 var Game = {
 		display: null,
 		offset: [0, 0], /* cell in left-top of canvas */
-		map: {},
 		colors: {},
 		engine: null,
 		player: null,
 		data: null,
 		entities: null,
 		freeCells: null,
+		map: {},
+		mapSize: [150,50],
+		mapSeen: {},
+		mapView: false,
 
 
 		
@@ -18,12 +21,16 @@ var Game = {
 						layout: "hex"
 				});
 				document.body.appendChild(this.display.getContainer());
+
+
 				
 				this.entities = {};
 
 				this._prepEntities();
 
 				this._resize();
+				this._miniMap();
+
 				window.addEventListener("resize", this._resize.bind(this));
 		},
 
@@ -97,7 +104,7 @@ var Game = {
 		_generateMap: function() {
 
 				/* hexagonal map and rules */
-				var w= 150, h=50;
+				var w= this.mapSize[0], h= this.mapSize[1];
 				var data = {};
 				this.map = new ROT.Map.Cellular(w, h, {
 						topology: 6,
@@ -166,6 +173,28 @@ var Game = {
 					this._draw(i+this.offset[0], j+this.offset[1]);
 				}
 			}
+
+			//map display
+			//this.mapDisplay.clear();
+			for (var id in this.mapSeen) {
+				var parts = id.split(",");
+				var x = parseInt(parts[0]);
+				var y = parseInt(parts[1]);
+				if (this.player._x === x && this.player._y === y) {
+					this.mapDisplay.draw(x,y,"@","black","yellow");
+				} else if (this.mapSeen[id]) {
+					this.mapDisplay.draw(x,y,"","","white");
+					if (this.data[id]) {
+						this.mapDisplay.draw(x,y,"","","grey");
+					} else if (this.entities[id]) {
+						this.mapDisplay.draw(x,y,"E","black","red");
+					}
+				} else {
+					this.mapDisplay.draw(x,y,"","","black");
+				}
+			}
+
+
 		},
 
 		_resize: function() {
@@ -173,6 +202,41 @@ var Game = {
 			this.display.setOptions({width:size[0], height:size[1]});
 			this.setCenter();
 		
+		},
+
+		_resizeMiniMap: function() {
+			Game.mapView = !Game.mapView;
+			var scale = 8,
+					fSize = 2,
+					space = 0.8;
+			if (Game.mapView) {
+				scale = 2;
+				fSize = 10;
+				space = 1;
+			}
+			var size = Game.mapDisplay.computeSize(window.innerWidth/scale, window.innerHeight/scale);
+			Game.mapDisplay.setOptions({
+				width:Game.mapSize[0], 
+				height:Game.mapSize[1],
+				fontSize: fSize,
+				spacing: space
+			});
+			Game.setCenter();
+		
+		},
+
+		_miniMap: function() {
+			this.mapDisplay = new ROT.Display({
+					fontSize: 2,
+					spacing: 0.8,
+					layout: "hex"
+			});
+			var size = this.mapDisplay.computeSize(window.innerWidth/9, window.innerHeight/9);
+			this.mapDisplay.setOptions({width:this.mapSize[0], height:this.mapSize[1]});
+			this.mapDisplay.getContainer().id = "minimap";
+			document.body.appendChild(this.mapDisplay.getContainer());
+			this.mapDisplay.getContainer().addEventListener("click", this._resizeMiniMap);
+
 		},
 
 

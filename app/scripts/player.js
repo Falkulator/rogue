@@ -43,7 +43,7 @@ Game.Player.prototype.act = function() {
 Game.Player.prototype.handleEvent = function(e) {
 
 	var dir = Game.display.eventToPosition(e);
-console.log(dir);
+
 	this.nx = dir[0] + Game.offset[0];
 	this.ny = dir[1] + Game.offset[1];
 
@@ -52,7 +52,8 @@ console.log(dir);
 	path.shift();
 	if (path.length < 1) {
 	} else if (Game.data[this.nx+","+this.ny]) {
-	}else {
+	} else if (Game.data[this.nx+","+this.ny] === undefined) {
+	} else {
 			x = path[0][0];
 			y = path[0][1];
 			//Game.display.draw(this._x, this._y, Game.map[this._x+","+this._y]);
@@ -89,14 +90,16 @@ var fovLighting = function() {
 		lighting.setLight(Game.entities[ent]._x, Game.entities[ent]._y,  Game.entities[ent].lightColor);
 	}
 	
-
+	fov.compute(Game.player._x, Game.player._y, 22, function(x, y, r, visibility) {
+	    Game.mapSeen[x+","+y] = 1;
+	});
 
 	var lightingCallback = function(x, y, color) {
 
 	    lightData[x+","+y] = color;
 	}
 	lighting.compute(lightingCallback);
-window.lightData = lightData;
+
 
 	/* all cells are lit by ambient light; some are also lit by light sources */
 	var ambientLight = [00, 00, 00];

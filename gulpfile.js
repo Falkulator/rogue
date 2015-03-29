@@ -5,6 +5,7 @@ var gulp = require('gulp');
 var $ = require('gulp-load-plugins')();
 var browserSync = require('browser-sync');
 var reload = browserSync.reload;
+var ghPages = require('gulp-gh-pages');
 
 gulp.task('styles', function () {
   return gulp.src('app/styles/main.scss')
@@ -21,6 +22,11 @@ gulp.task('styles', function () {
     .pipe($.sourcemaps.write())
     .pipe(gulp.dest('.tmp/styles'))
     .pipe(reload({stream: true}));
+});
+
+gulp.task('deploy', function() {
+  return gulp.src('./dist/**/*')
+    .pipe(ghPages());
 });
 
 gulp.task('jshint', function () {
