@@ -3,20 +3,22 @@ var Game = {
 		offset: [0, 0], /* cell in left-top of canvas */
 		colors: {},
 		engine: null,
+		scheduler: null,
 		player: null,
+		players: null,
 		data: null,
-		entities: null,
+		land: null,
 		freeCells: null,
 		map: {},
 		mapSize: [150,50],
-		mapSeen: {},
+		mapVisible: {},
 		mapView: false,
 
 
 		
 		init: function() {
 				this.display = new ROT.Display({
-						fontSize: 22,
+						fontSize: 12,
 						spacing: 2,
 						layout: "hex"
 				});
@@ -24,17 +26,63 @@ var Game = {
 
 
 				
-				this.entities = {};
+				this.land = {};
+				this.players = {};
 
 				this._prepEntities();
 
 				this._resize();
-				this._miniMap();
+				//this._miniMap();
 
 				window.addEventListener("resize", this._resize.bind(this));
 		},
 
 		_prepEntities: function() { 
+			this._generateMap();
+			this.players['p1'] = this._getFreeCell(this.freeCells);
+			this.players['p2'] = this._getFreeCell(this.freeCells);
+			// this.players['p3'] = this._getFreeCell(this.freeCells);
+			// this.players['p4'] = this._getFreeCell(this.freeCells);
+			var playersSeperated = false;
+			for (var i in this.players) {
+				for (var j in this.players) {
+					if (i !== j) {
+						if (this._getPath(this.players[i],this.players[j]).length < 30) {
+							playersSeperated = true;
+						}
+					}
+
+				}
+			}
+			this.players['p1'] = this.players['p1'].map(function(i) {return 2 * Math.round(i / 2)});//for valid hex value
+			this.players['p2'] = this.players['p2'].map(function(i) {return 2 * Math.round(i / 2)});//for valid hex value
+
+			if (playersSeperated) {
+				this._prepEntities();
+			} else {
+
+				//var exit = new Game.Exit(e[0], e[1]);
+				this.player = new Game.Player(this.players['p1'][0], this.players['p1'][1], "blue");
+				var player2 = new Game.Player(this.players['p2'][0], this.players['p2'][1], "red");
+				// var player3 = new Game.Player(this.players['p3'][0], this.players['p3'][1], "green");
+				// var player4 = new Game.Player(this.players['p4'][0], this.players['p4'][1], "orange");
+				for (var i=0;i<12;i++) {
+					var m = this._getFreeCell(this.freeCells);
+				}
+
+				this.setCenter();
+				this.scheduler = new ROT.Scheduler.Simple();
+				this.scheduler.add(this.player, true);
+				this.scheduler.add(player2, true);
+				//scheduler.add(exit, true);
+				this.engine = new ROT.Engine(this.scheduler);
+				this.engine.start();
+			}
+
+
+		},
+
+		_prepLands: function() {
 			this._generateMap();
 			var p = this._getFreeCell(this.freeCells);
 			var e = this._getFreeCell(this.freeCells);
@@ -43,21 +91,28 @@ var Game = {
 				this._prepEntities();
 			} else {
 
-				var exit = new Game.Exit(e[0], e[1]);
 				this.player = new Game.Player(p[0], p[1]);
-				for (var i=0;i<12;i++) {
-					var m = this._getFreeCell(this.freeCells);
-				}
 
 				this.setCenter();
 				var scheduler = new ROT.Scheduler.Simple();
 				scheduler.add(this.player, true);
-				scheduler.add(exit, true);
+
 				this.engine = new ROT.Engine(scheduler);
 				this.engine.start();
 			}
 
 
+		},
+
+		setLand: function(player, x, y) {
+			var key = x+","+y;
+			if (!this.data[key]) {
+				this.land[key] = {
+					player: player,
+					color: player.color,
+					troops: 1
+				}
+			}
 		},
 
 		setEntity: function(entity, x, y) {
@@ -146,17 +201,7 @@ var Game = {
 				var y = k[1];
 				return [x, y];
 		},
-		
-		_createBeing: function(what, freeCells) {
 
-				var index = Math.floor(ROT.RNG.getUniform() * freeCells.length);
-				var key = freeCells.splice(index, 1)[0];
-							console.log("being ",key)
-				var parts = key.split(",");
-				var x = parseInt(parts[0]);
-				var y = parseInt(parts[1]);
-				return new what(x, y);
-		},
 
 		setCenter: function() {
 			var pos = [this.player._x, this.player._y];
@@ -168,31 +213,21 @@ var Game = {
 			/* redraw all */
 			this.display.clear();
 
+			// for (var j=0 - 1;j<opts.height + 1;j++) {
+			// 	for (var i=j%2 - 2;i<opts.width + 2;i+=2) {
+			// 		//this._draw(i+this.offset[0], j+this.offset[1]);
+			// 		this._draw(i, j);
+			// 	}
+			// }
+
 			for (var j=0 - 1;j<opts.height + 1;j++) {
-				for (var i=j%2 - 2;i<opts.width + 2;i+=2) {
-					this._draw(i+this.offset[0], j+this.offset[1]);
+				for (var i=j%2 - 2;i<opts.width+ 2;i+=2) {
+					//this._draw(i+this.offset[0], j+this.offset[1]);
+					this._draw(i, j);
 				}
 			}
 
-			//map display
-			//this.mapDisplay.clear();
-			for (var id in this.mapSeen) {
-				var parts = id.split(",");
-				var x = parseInt(parts[0]);
-				var y = parseInt(parts[1]);
-				if (this.player._x === x && this.player._y === y) {
-					this.mapDisplay.draw(x,y,"@","black","yellow");
-				} else if (this.mapSeen[id]) {
-					this.mapDisplay.draw(x,y,"","","white");
-					if (this.data[id]) {
-						this.mapDisplay.draw(x,y,"","","grey");
-					} else if (this.entities[id]) {
-						this.mapDisplay.draw(x,y,"E","black","red");
-					}
-				} else {
-					this.mapDisplay.draw(x,y,"","","black");
-				}
-			}
+			//this.drawMap();
 
 
 		},
@@ -241,18 +276,51 @@ var Game = {
 
 
 		_draw: function(x, y) {
-			var dispX = x - this.offset[0];
-			var dispY = y - this.offset[1];
+			// var dispX = x - this.offset[0];
+			// var dispY = y - this.offset[1];
+			var dispX = x;
+			var dispY = y;
 			var key = x+","+y;
-			var entity = this.entities[key];
+			var land = this.land[key];
 			var tile = this.data[key];
 
-		if (entity) {
-				var color = this.getColor(x,y);
-				this.display.draw(dispX, dispY, entity.ch, entity.fg, color);
+			if (land) {
+					this.display.draw(dispX, dispY, land.troops, "", land.color);
+			} else if(!tile) {
+
+				this.display.draw(dispX, dispY, null, null, "white");
 			} else {
-				var color = this.getColor(x,y);
-				this.display.draw(dispX, dispY, null, null, color);
+				this.display.draw(dispX, dispY, null, null, "black");
+			}
+		},
+
+		getHexNeighbors: function(x,y) {
+			var arr = [];
+			var n = [[-2,0],[2, 0],[-1,-1],[1,1],[-1,1],[1,-1]];
+			n.map(function(a) {
+				arr.push([a[0]+x,a[1]+y]);
+			})
+			return arr;
+		},
+
+		drawMap: function() {
+			//this.mapDisplay.clear();
+			for (var id in this.mapVisible) {
+				var parts = id.split(",");
+				var x = parseInt(parts[0]);
+				var y = parseInt(parts[1]);
+				if (this.player._x === x && this.player._y === y) {
+					this.mapDisplay.draw(x,y,"@","black","yellow");
+				} else if (this.mapVisible[id]) {
+					this.mapDisplay.draw(x,y,"","","white");
+					if (this.data[id]) {
+						this.mapDisplay.draw(x,y,"","","grey");
+					} else if (this.land[id]) {
+						this.mapDisplay.draw(x,y,"E","black","red");
+					}
+				} else {
+					this.mapDisplay.draw(x,y,"","","black");
+				}
 			}
 		},
 

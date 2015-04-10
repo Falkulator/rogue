@@ -1,21 +1,25 @@
 
-Game.Player = function(x, y) {
-		Game.Entity.call(this, "@", "yellow");
-		this._x = x;
-		this._y = y;
+Game.Player = function(x, y, color) {
+
+		this.controlled = {};
+		this.troopsTotal = 1;
+		this.troopsPerTurn = 1;
 		this.nx = x;
 		this.ny = y;
-		this.hasLight = true;
-		this.lightColor = [200, 200, 200];
-
-		Game.setEntity(this,x,y);
+		this.color = color;
+		this.emNeighbors = {};
+		this.enNeighbors = {};
 
 		
-		Game.display.getContainer().addEventListener("click", this);
+		this.addLand(x,y);
+		
+		this.ai = new Game.AI(this);
+		//Game.display.getContainer().addEventListener("click", this);
+
 
 }
 
-Game.Player.prototype = Object.create(Game.Entity.prototype); // See note below
+//Game.Player.prototype = Object.create(Game.Entity.prototype); // See note below
 Game.Player.prototype.constructor = Game.Player;
 
 Game.Player.prototype.getPath= function(end) { 
@@ -36,40 +40,112 @@ Game.Player.prototype.getPath= function(end) {
 }
 
 Game.Player.prototype.act = function() {
-	Game.engine.lock();
+	var promise = {
+        then: function(cb) { done = cb; }
+    }
+	this.getTroops();
+	this.ai.update();
+	setTimeout(function() { done(); }, 5);
+	return promise;
 
 }
+
+Game.Player.prototype.getTroops = function() {
+	var count = Object.keys(this.controlled).length;
+	this.troopsPerTurn = Math.floor(count/5) + 1;
+	this.countTroops();
+}
+
+Game.Player.prototype.countTroops = function() {
+	this.troopsTotal = 0;
+	for (var key in this.controlled) {
+		if (Game.land[key] !== undefined) {
+			this.troopsTotal += Game.land[key].troops;
+		}
 		
+	}
+}
+
+Game.Player.prototype.addLand = function(x,y) {
+	this.controlled[x+","+y] = 1;
+	Game.setLand(this,x,y);
+	Game._draw(x,y);
+}
+
+Game.Player.prototype.getSpeed = function() {
+	return 100;
+}
+
+Game.Player.prototype.attack = function(land) {
+	return 100;
+}
+
+Game.Player.prototype.getEmNeighbors = function() {
+	var	player = this,
+		emNeighbors = this.emNeighbors,
+		enNeighbors = this.enNeighbors;
+	for (var id in this.controlled) {
+		var parts = id.split(",");
+		var x = parseInt(parts[0]);
+		var y = parseInt(parts[1]);
+
+		var ns = Game.getHexNeighbors(x,y);
+		
+		ns.map(function(n) { 
+			var key =n[0]+","+n[1];
+			if (!player.controlled[key]) {
+				if (!Game.data[key] && Game.data[key] !== undefined) {
+					if (!Game.land[key]) {
+						emNeighbors[key] = 1;
+					} else {
+						enNeighbors[key] = 1;
+					}
+				} 
+			}
+
+		})
+	}
+
+
+}
+
 Game.Player.prototype.handleEvent = function(e) {
 
 	var dir = Game.display.eventToPosition(e);
 
-	this.nx = dir[0] + Game.offset[0];
-	this.ny = dir[1] + Game.offset[1];
+	// this.nx = dir[0] + Game.offset[0];
+	// this.ny = dir[1] + Game.offset[1];
+	this.nx = dir[0];
+	this.ny = dir[1];
+	console.log(dir[0],dir[1])
+	Game.setLand(this,dir[0],dir[1]);
 
-	var path = this.getPath([this.nx, this.ny]);
+	//fovLighting();
+	setFov();
+	Game.setCenter();
+	Game.engine.unlock();
+}
 
-	path.shift();
-	if (path.length < 1) {
-	} else if (Game.data[this.nx+","+this.ny]) {
-	} else if (Game.data[this.nx+","+this.ny] === undefined) {
-	} else {
-			x = path[0][0];
-			y = path[0][1];
-			//Game.display.draw(this._x, this._y, Game.map[this._x+","+this._y]);
-			this._x = x;
-			this._y = y;
-			Game.setEntity(this, x, y);
+var setFov = function() {
+	Game.mapVisible = {};
+	var lightPasses = function(x, y) {
+	  var key = x+","+y;
+	  if (key in Game.data) { return (Game.data[key] == 0); }
+		return false;
 	}
-		fovLighting();
-		Game.setCenter();
-		Game.engine.unlock();
+
+	var fov = new ROT.FOV.PreciseShadowcasting(lightPasses, {topology:6});
+
+	fov.compute(Game.player._x, Game.player._y, 22, function(x, y, r, visibility) {
+	    Game.mapVisible[x+","+y] = 1;
+	});
+
 }
 
 var fovLighting = function() {
 	var lightPasses = function(x, y) {
-  var key = x+","+y;
-  if (key in Game.data) { return (Game.data[key] == 0); }
+	  var key = x+","+y;
+	  if (key in Game.data) { return (Game.data[key] == 0); }
 		return false;
 	}
 
@@ -146,6 +222,7 @@ Game.Player.prototype._checkBox = function() {
 				alert("This box is empty :-(");
 		}
 }
+
 		
 var Pedro = function(x, y) {
 		this._x = x;
